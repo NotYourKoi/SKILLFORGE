@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f0e1;
+  --foreground: #0a0a0a;
 }
 
 @theme inline {
@@ -12,15 +12,60 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-cream: #f5f0e1;
+  --color-grid: #e1dccd;
+  --color-teal: #a3c9be;
+  --color-ink: #1e1e1e;
+  --color-soot: #0a0a0a;
+  --color-complete: #7ecc7e;
+  --color-unlocked: #6b99e5;
+  --color-locked: #aaaaaa;
+  --color-danger: #f06464;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-mono);
+}
+
+/* Visible, consistent keyboard focus everywhere (color + offset, Forge palette). */
+:focus-visible {
+  outline: 2px solid var(--color-unlocked);
+  outline-offset: 2px;
+}
+
+/* Skip-link target: never show the native focus outline on the main region. */
+#main-content:focus {
+  outline: none;
+}
+
+/* Respect users who prefer reduced motion: collapse decorative transitions. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Shiki (lesson code blocks): blend into the card instead of its own white box. */
+.lesson-code .shiki {
+  margin: 0;
+  background: transparent !important;
+}
+
+.lesson-code .shiki code {
+  font-family: var(--font-geist-mono);
+  font-size: 0.875rem;
+  line-height: 1.75;
+}
+
+.lesson-code .shiki:focus-visible {
+  outline: 2px solid var(--color-unlocked);
+  outline-offset: 2px;
 }
