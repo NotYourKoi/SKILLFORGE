@@ -1,14 +1,12 @@
 // SkillForge Prisma schema.
-// SQLite for local development. Swap `datasource` to postgresql + set DATABASE_URL
-// for production — models use portable types only (String ids, DateTime, Int, Boolean).
+// Configured for Supabase PostgreSQL.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model User {
