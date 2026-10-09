@@ -3,6 +3,9 @@ import type { ElementContent } from "hast";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkDirective from "remark-directive";
 import CodeBlock from "./code-block";
+import MemoryVisualizer from "@/components/visualizers/memory-visualizer";
+import OwnershipVisualizer from "@/components/visualizers/ownership-visualizer";
+import { MEMORY_SCENARIOS, OWNERSHIP_SCENARIOS } from "@/lib/visualizers/scenarios";
 
 type DirectiveNode = { name?: string; attributes?: Record<string, string> };
 
@@ -41,9 +44,35 @@ function WarningCallout({ children }: { children?: ReactNode }) {
   );
 }
 
+function VisualizerDirective({
+  type,
+  scenario,
+}: {
+  type?: string;
+  scenario?: string;
+}) {
+  if (type === "ownership") {
+    const sc =
+      OWNERSHIP_SCENARIOS.find((s) => s.id === scenario) || OWNERSHIP_SCENARIOS[0];
+    return (
+      <div className="my-6">
+        <OwnershipVisualizer scenario={sc} />
+      </div>
+    );
+  }
+  const sc =
+    MEMORY_SCENARIOS.find((s) => s.id === scenario) || MEMORY_SCENARIOS[0];
+  return (
+    <div className="my-6">
+      <MemoryVisualizer scenario={sc} />
+    </div>
+  );
+}
+
 const components: Components & {
   note: ComponentType<{ children?: ReactNode }>;
   warning: ComponentType<{ children?: ReactNode }>;
+  visualizer: ComponentType<{ type?: string; scenario?: string }>;
 } = {
   h2: ({ children }) => (
     <h2 className="mb-2 mt-8 border-b-2 border-grid pb-1 text-base font-black uppercase tracking-wide text-soot">
@@ -92,6 +121,7 @@ const components: Components & {
   pre: ({ children }) => <>{children}</>,
   note: NoteCallout,
   warning: WarningCallout,
+  visualizer: VisualizerDirective,
 };
 
 export default function LessonContent({ content }: { content: string }) {
@@ -99,7 +129,11 @@ export default function LessonContent({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkDirective]}
       remarkRehypeOptions={{
-        handlers: { containerDirective: directiveToElement },
+        handlers: {
+          containerDirective: directiveToElement,
+          leafDirective: directiveToElement,
+          textDirective: directiveToElement,
+        },
       }}
       components={components}
     >

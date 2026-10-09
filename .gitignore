@@ -50,3 +50,5 @@ next-env.d.ts
 
 # local server logs
 server*.log
+.vercel
+.env*

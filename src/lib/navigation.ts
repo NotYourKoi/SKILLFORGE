@@ -7,6 +7,7 @@ const ALL_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/explore", label: "Explore" },
   { href: "/courses", label: "Courses" },
+  { href: "/visualizers", label: "Visualizers" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/projects", label: "Projects" },
   { href: "/progress", label: "Progress" },
