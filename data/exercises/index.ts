@@ -381,4 +381,214 @@ export const exercises: ExerciseSeed[] = [
       },
     ],
   },
+  {
+    id: "RUST_EX_SUM_POSITIVES",
+    skillId: "CS_BASICS",
+    title: "Rust: Sum of Positives",
+    prompt:
+      "Implement a function `pub fn sum_positives(numbers: &[i32]) -> i32` that calculates the sum of all strictly positive integers in the given slice. If the slice has no positive integers or is empty, return 0.",
+    description:
+      "Practice Rust slice indexing, iterators, and basic conditional filtering.",
+    requirements: [
+      "Define a public function `pub fn sum_positives(numbers: &[i32]) -> i32`.",
+      "Return the sum of all elements strictly greater than 0.",
+      "Return 0 if the slice is empty or contains no positive numbers.",
+    ],
+    examples: [
+      {
+        input: "&[1, 2, 3, -4, 5]",
+        output: "11",
+        note: "1 + 2 + 3 + 5 = 11",
+      },
+      {
+        input: "&[-1, -2, -3]",
+        output: "0",
+        note: "No positive integers",
+      },
+    ],
+    constraints: ["Input elements fit within standard 32-bit signed integers."],
+    language: "rust",
+    starterCode:
+      "pub fn sum_positives(numbers: &[i32]) -> i32 {\n    // Sum only strictly positive integers\n    0\n}\n",
+    solution:
+      "pub fn sum_positives(numbers: &[i32]) -> i32 {\n    numbers.iter().filter(|&&x| x > 0).sum()\n}\n",
+    hints: [
+      "Iterate through the slice with numbers.iter()",
+      "Filter positive items with .filter(|&&x| x > 0) or use a for loop with an if x > 0 check",
+      "Accumulate the total sum and return it",
+    ],
+    difficulty: "Easy",
+    order: 3,
+    testCases: [
+      {
+        input: "sum_positives(&[1, 2, 3, -4, 5])",
+        expectedOutput: "11",
+        description: "Positive and negative mix",
+        order: 1,
+        isPublic: true,
+      },
+      {
+        input: "sum_positives(&[-1, -2, -3])",
+        expectedOutput: "0",
+        description: "All negative items",
+        order: 2,
+        isPublic: true,
+      },
+      {
+        input: "sum_positives(&[0, 10, -5, 20, 0])",
+        expectedOutput: "30",
+        description: "Zeros and large positives",
+        order: 3,
+        isPublic: false,
+      },
+      {
+        input: "sum_positives(&[])",
+        expectedOutput: "0",
+        description: "Empty slice",
+        order: 4,
+        isPublic: false,
+      },
+    ],
+  },
+  {
+    id: "RUST_EX_FIRST_WORD",
+    skillId: "C_POINTERS",
+    title: "Rust: First Word Slices",
+    prompt:
+      "Implement a function `pub fn first_word(s: &str) -> &str` that takes a string slice and returns the first word (all characters up to the first space). If the string contains no spaces, return the entire string slice.",
+    description:
+      "Master Rust string slice borrowing and byte iteration without unnecessary heap allocations.",
+    requirements: [
+      "Define a public function `pub fn first_word(s: &str) -> &str`.",
+      "Return a string slice `&str` containing characters up to the first whitespace ' '.",
+      "If no spaces exist, return the entire string slice `s`.",
+    ],
+    examples: [
+      {
+        input: "\"hello world\"",
+        output: "hello",
+        note: "Returns slice up to space",
+      },
+      {
+        input: "\"skillforge\"",
+        output: "skillforge",
+        note: "No spaces present",
+      },
+    ],
+    constraints: [
+      "Respect Rust borrowing and slice semantics without allocating a new String.",
+    ],
+    language: "rust",
+    starterCode:
+      "pub fn first_word(s: &str) -> &str {\n    // Return slice up to first space\n    s\n}\n",
+    solution:
+      "pub fn first_word(s: &str) -> &str {\n    let bytes = s.as_bytes();\n    for (i, &item) in bytes.iter().enumerate() {\n        if item == b' ' {\n            return &s[0..i];\n        }\n    }\n    s\n}\n",
+    hints: [
+      "Convert the string to a byte slice using s.as_bytes()",
+      "Iterate through byte elements with .iter().enumerate()",
+      "Check for space byte b' ' and return &s[0..i]",
+    ],
+    difficulty: "Medium",
+    order: 0,
+    testCases: [
+      {
+        input: "first_word(\"hello world\")",
+        expectedOutput: "hello",
+        description: "Basic two-word string",
+        order: 1,
+        isPublic: true,
+      },
+      {
+        input: "first_word(\"skillforge\")",
+        expectedOutput: "skillforge",
+        description: "Single word with no space",
+        order: 2,
+        isPublic: true,
+      },
+      {
+        input: "first_word(\"rust memory safety guarantees\")",
+        expectedOutput: "rust",
+        description: "Sentence with multiple words",
+        order: 3,
+        isPublic: false,
+      },
+      {
+        input: "first_word(\"\")",
+        expectedOutput: "",
+        description: "Empty string",
+        order: 4,
+        isPublic: false,
+      },
+    ],
+  },
+  {
+    id: "RUST_EX_SENSOR_CLAMP",
+    skillId: "C_MEM",
+    title: "Rust Embedded: Sensor Voltage Clamp",
+    prompt:
+      "In embedded systems, analog sensor readings can fluctuate due to electrical noise. Implement `pub fn clamp_sensor(reading: i32, min_val: i32, max_val: i32) -> i32` to restrict sensor readings strictly within allowable hardware bounds `[min_val, max_val]`.",
+    description:
+      "Safely clamp values for embedded microcontrollers and hardware peripherals.",
+    requirements: [
+      "Define a public function `pub fn clamp_sensor(reading: i32, min_val: i32, max_val: i32) -> i32`.",
+      "If `reading < min_val`, return `min_val`.",
+      "If `reading > max_val`, return `max_val`.",
+      "Otherwise return `reading`.",
+    ],
+    examples: [
+      {
+        input: "reading: 150, min_val: 0, max_val: 100",
+        output: "100",
+        note: "Clamped to upper threshold",
+      },
+      {
+        input: "reading: -25, min_val: 0, max_val: 100",
+        output: "0",
+        note: "Clamped to lower threshold",
+      },
+    ],
+    constraints: ["Assume min_val <= max_val."],
+    language: "rust",
+    starterCode:
+      "pub fn clamp_sensor(reading: i32, min_val: i32, max_val: i32) -> i32 {\n    // Clamp reading between min_val and max_val\n    reading\n}\n",
+    solution:
+      "pub fn clamp_sensor(reading: i32, min_val: i32, max_val: i32) -> i32 {\n    if reading < min_val {\n        min_val\n    } else if reading > max_val {\n        max_val\n    } else {\n        reading\n    }\n}\n",
+    hints: [
+      "Compare reading against min_val first",
+      "Compare reading against max_val second",
+      "You can also use standard Rust method reading.clamp(min_val, max_val)",
+    ],
+    difficulty: "Easy",
+    order: 0,
+    testCases: [
+      {
+        input: "clamp_sensor(150, 0, 100)",
+        expectedOutput: "100",
+        description: "Above max threshold",
+        order: 1,
+        isPublic: true,
+      },
+      {
+        input: "clamp_sensor(-25, 0, 100)",
+        expectedOutput: "0",
+        description: "Below min threshold",
+        order: 2,
+        isPublic: true,
+      },
+      {
+        input: "clamp_sensor(64, 0, 100)",
+        expectedOutput: "64",
+        description: "Within safe threshold",
+        order: 3,
+        isPublic: false,
+      },
+      {
+        input: "clamp_sensor(-1000, -500, 500)",
+        expectedOutput: "-500",
+        description: "Negative bounds clamping",
+        order: 4,
+        isPublic: false,
+      },
+    ],
+  },
 ];

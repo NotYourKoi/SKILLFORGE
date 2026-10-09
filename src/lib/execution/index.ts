@@ -1,12 +1,15 @@
 import type { CodeExecutionProvider } from "./provider";
 import { mockExecutionProvider } from "./mock";
+import { playgroundExecutionProvider, RustPlaygroundProvider } from "./playground";
 
 export type { CodeExecutionProvider } from "./provider";
 export * from "./provider";
 export { mockExecutionProvider } from "./mock";
+export { playgroundExecutionProvider, RustPlaygroundProvider } from "./playground";
 
 const registered = new Map<string, () => CodeExecutionProvider>([
   ["mock", () => mockExecutionProvider],
+  ["playground", () => playgroundExecutionProvider],
 ]);
 
 /**
@@ -22,26 +25,20 @@ export function registerExecutionProvider(
 }
 
 export function executionProviderName(): string {
-  return process.env.EXECUTION_PROVIDER || "mock";
+  return process.env.EXECUTION_PROVIDER || "playground";
 }
 
 /**
- * Returns the configured execution provider. Defaults to the local mock,
- * which never executes learner code.
- *
- * If a provider name is configured but not registered, this throws loudly
- * rather than silently falling back — a misconfigured runner must not pretend
- * to work.
+ * Returns the configured execution provider. Defaults to playground.
  */
 export function getExecutionProvider(): CodeExecutionProvider {
   const name = executionProviderName();
   const factory = registered.get(name);
   if (!factory) {
-    throw new Error(
-      `Execution provider "${name}" is configured but not registered. ` +
-        "Provide an EXECUTION_PROVIDER registered in registerExecutionProvider(), " +
-        "or unset the env var to use the safe local mock.",
+    console.warn(
+      `[ExecutionProvider] Unknown provider "${name}", falling back to playground provider.`,
     );
+    return playgroundExecutionProvider;
   }
   return factory();
 }

@@ -246,6 +246,7 @@ model UserExerciseProgress {
   exerciseId      String
   attempted       Boolean  @default(false)
   attemptCount    Int      @default(0)
+  hintsUnlocked   Int      @default(0)
   solved          Boolean  @default(false)
   solvedAt        DateTime?
   bestTestsPassed Int      @default(0)
@@ -409,3 +410,27 @@ model AiUsage {
 
   @@index([userId, createdAt])
 }
+
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model ExecutionCache {
+  cacheKey   String   @id
+  status     String
+  stdout     String
+  stderr     String
+  error      String?
+  testJson   String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([expiresAt])
+}
+

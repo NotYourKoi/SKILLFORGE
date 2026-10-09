@@ -6,6 +6,12 @@ import {
   type ExecutionResult,
   type TestResult,
 } from "@/lib/execution";
+import { checkRateLimit } from "@/lib/ratelimit";
+import {
+  computeExecutionCacheKey,
+  getCachedExecution,
+  setCachedExecution,
+} from "@/lib/execution/cache";
 
 export interface ExerciseTestCaseView {
   order: number;
@@ -21,6 +27,7 @@ export interface ExerciseStatusView {
   lastAttemptAt: Date | null;
   bestTestsPassed: number;
   bestTestsTotal: number;
+  hintsUnlocked: number;
 }
 
 export interface ExerciseProblemView {
@@ -31,6 +38,8 @@ export interface ExerciseProblemView {
   requirements: string[];
   examples: { input: string; output: string; note?: string }[];
   constraints: string[];
+  totalHintsCount: number;
+  unlockedHints: string[];
   hints: string[];
   language: string;
   difficulty: string;
@@ -38,7 +47,14 @@ export interface ExerciseProblemView {
   order: number;
   skill: { id: string; name: string };
   status: ExerciseStatusView | null;
-  lastAttempt: { status: string; passed: boolean; testsPassed: number; testsTotal: number; createdAt: Date } | null;
+  publicTestCases: ExerciseTestCaseView[];
+  lastAttempt: {
+    status: string;
+    passed: boolean;
+    testsPassed: number;
+    testsTotal: number;
+    createdAt: Date;
+  } | null;
 }
 
 export interface ExerciseSummaryView {
@@ -59,7 +75,9 @@ function parseJsonArray(value: string): string[] {
   }
 }
 
-function parseExamples(value: string): { input: string; output: string; note?: string }[] {
+function parseExamples(
+  value: string,
+): { input: string; output: string; note?: string }[] {
   try {
     const parsed = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];
@@ -71,7 +89,10 @@ function parseExamples(value: string): { input: string; output: string; note?: s
   }
 }
 
-async function getStatus(userId: string, exerciseId: string): Promise<ExerciseStatusView | null> {
+async function getStatus(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseStatusView | null> {
   const progress = await prisma.userExerciseProgress.findUnique({
     where: { userId_exerciseId: { userId, exerciseId } },
   });
@@ -83,12 +104,14 @@ async function getStatus(userId: string, exerciseId: string): Promise<ExerciseSt
     lastAttemptAt: progress.lastAttemptAt,
     bestTestsPassed: progress.bestTestsPassed,
     bestTestsTotal: progress.bestTestsTotal,
+    hintsUnlocked: progress.hintsUnlocked ?? 0,
   };
 }
 
 /**
  * Loads one exercise for the learner UI. Only public test cases are exposed;
  * the solution and hidden test cases are never sent to the client.
+ * Hints are graduated: only unlocked hints are returned.
  */
 export async function getExercise(
   exerciseId: string,
@@ -98,7 +121,10 @@ export async function getExercise(
     where: { id: exerciseId },
     include: {
       skill: { select: { id: true, name: true } },
-      testCases: { orderBy: { order: "asc" } },
+      testCases: {
+        where: { isPublic: true },
+        orderBy: { order: "asc" },
+      },
     },
   });
   if (!exercise) return null;
@@ -111,6 +137,17 @@ export async function getExercise(
     }),
   ]);
 
+  const allHints = parseJsonArray(exercise.hints);
+  const hintsUnlockedCount = status?.hintsUnlocked ?? 0;
+  const unlockedHints = allHints.slice(0, hintsUnlockedCount);
+
+  const publicTestCases: ExerciseTestCaseView[] = exercise.testCases.map((tc) => ({
+    order: tc.order,
+    description: tc.description,
+    input: tc.input,
+    expectedOutput: tc.expectedOutput,
+  }));
+
   return {
     id: exercise.id,
     title: exercise.title,
@@ -119,13 +156,16 @@ export async function getExercise(
     requirements: parseJsonArray(exercise.requirements),
     examples: parseExamples(exercise.examples),
     constraints: parseJsonArray(exercise.constraints),
-    hints: parseJsonArray(exercise.hints),
+    totalHintsCount: allHints.length,
+    unlockedHints,
+    hints: unlockedHints,
     language: exercise.language,
     difficulty: exercise.difficulty,
     starterCode: exercise.starterCode,
     order: exercise.order,
     skill: exercise.skill,
     status,
+    publicTestCases,
     lastAttempt: lastAttempt
       ? {
           status: lastAttempt.status,
@@ -170,10 +210,48 @@ export async function getExercisesBySkill(
             lastAttemptAt: row.lastAttemptAt,
             bestTestsPassed: row.bestTestsPassed,
             bestTestsTotal: row.bestTestsTotal,
+            hintsUnlocked: row.hintsUnlocked ?? 0,
           }
         : null,
     };
   });
+}
+
+/**
+ * Unlocks the next graduated hint for a learner on an exercise.
+ */
+export async function unlockHint(
+  exerciseId: string,
+  userId: string,
+): Promise<{ error?: string; unlockedHints?: string[]; hintsUnlockedCount?: number }> {
+  const exercise = await prisma.exercise.findUnique({
+    where: { id: exerciseId },
+    select: { hints: true },
+  });
+  if (!exercise) return { error: "Exercise not found" };
+
+  const allHints = parseJsonArray(exercise.hints);
+  if (allHints.length === 0) {
+    return { error: "No hints available for this exercise." };
+  }
+
+  const progress = await prisma.userExerciseProgress.upsert({
+    where: { userId_exerciseId: { userId, exerciseId } },
+    update: {
+      hintsUnlocked: { increment: 1 },
+    },
+    create: {
+      userId,
+      exerciseId,
+      hintsUnlocked: 1,
+    },
+  });
+
+  const count = Math.min(progress.hintsUnlocked, allHints.length);
+  return {
+    unlockedHints: allHints.slice(0, count),
+    hintsUnlockedCount: count,
+  };
 }
 
 export interface ExerciseSubmissionResult {
@@ -186,14 +264,14 @@ export interface ExerciseSubmissionResult {
   executionTimeMs?: number;
   error?: string;
   attemptId: string;
-  /** Results for PUBLIC test cases only — hidden cases are never revealed. */
+  cached?: boolean;
+  /** Results for all test cases (hidden test contents sanitized) */
   results: TestResult[];
 }
 
 /**
  * Grades a submission through the configured provider and records the
- * attempt plus progress. Provider is injectable for tests; hidden test cases
- * are passed to the provider but filtered out of the returned result.
+ * attempt plus progress. All pass/fail checks run strictly server-side.
  */
 export async function submitExercise(
   exerciseId: string,
@@ -204,6 +282,17 @@ export async function submitExercise(
   const validationError = codeValidationError(code);
   if (validationError) return { error: validationError };
 
+  // Shared Rate Limit check: 20 submits per minute for logged-in users
+  const rateCheck = await checkRateLimit({
+    key: `submit:${userId}`,
+    limit: 20,
+    windowSeconds: 60,
+    actionName: "trial test submission",
+  });
+  if (!rateCheck.allowed) {
+    return { error: rateCheck.reason };
+  }
+
   const exercise = await prisma.exercise.findUnique({
     where: { id: exerciseId },
     include: { testCases: { orderBy: { order: "asc" } } },
@@ -211,18 +300,31 @@ export async function submitExercise(
   if (!exercise) return { error: "Exercise not found" };
   if (exercise.testCases.length === 0) return { error: "Exercise has no test cases" };
 
-  const execution = await provider.submit({
-    code,
-    language: exercise.language,
-    testCases: exercise.testCases.map((testCase) => ({
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput,
-      isPublic: testCase.isPublic,
-    })),
-  });
+  // Check Execution Cache for identical code
+  const cacheKey = computeExecutionCacheKey(exercise.language, exercise.id, code);
+  let execution = await getCachedExecution(cacheKey);
+  let isCached = false;
+
+  if (execution) {
+    isCached = true;
+  } else {
+    // Execute against real runner with full public + hidden test harness
+    execution = await provider.submit({
+      code,
+      language: exercise.language,
+      testCases: exercise.testCases.map((tc) => ({
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        isPublic: tc.isPublic,
+      })),
+    });
+
+    // Cache deterministic result
+    await setCachedExecution(cacheKey, execution, 300);
+  }
 
   const testsPassed =
-    execution.testResults?.filter((testResult) => testResult.passed).length ?? 0;
+    execution.testResults?.filter((t) => t.passed).length ?? 0;
   const testsTotal = execution.testResults?.length ?? exercise.testCases.length;
   const passed =
     execution.status === "ok" &&
@@ -256,7 +358,7 @@ export async function submitExercise(
       attempted: true,
       attemptCount: { increment: 1 },
       solved: passed ? true : undefined,
-      solvedAt: passed ? { set: new Date() } : undefined,
+      solvedAt: passed ? (existingProgress?.solved ? undefined : new Date()) : undefined,
       bestTestsPassed,
       bestTestsTotal,
       lastAttemptAt: new Date(),
@@ -274,12 +376,28 @@ export async function submitExercise(
     },
   });
 
+  // Sanitize test results for client delivery:
+  // Public test cases keep their input & expected output.
+  // Hidden test cases have input, expected, and actual scrubbed to prevent leaking answers.
   const publicOrders = new Set(
-    exercise.testCases.filter((testCase) => testCase.isPublic).map((testCase) => testCase.order),
+    exercise.testCases.filter((tc) => tc.isPublic).map((tc) => tc.order),
   );
-  const visibleResults = (execution.testResults ?? [])
-    .filter((testResult) => publicOrders.has(testResult.order))
-    .map((testResult) => testResult);
+
+  const sanitizedResults: TestResult[] = (execution.testResults ?? []).map((t) => {
+    if (publicOrders.has(t.order)) {
+      return t;
+    }
+    return {
+      order: t.order,
+      name: `🔒 Hidden Battle Test ${t.order}`,
+      passed: t.passed,
+      isPublic: false,
+      input: "[HIDDEN]",
+      expectedOutput: "[HIDDEN]",
+      actualOutput: t.passed ? "[PASSED]" : "[FAILED]",
+      error: t.error ? "Hidden test assertion failed" : undefined,
+    };
+  });
 
   const result: ExerciseSubmissionResult = {
     status: execution.status,
@@ -291,24 +409,45 @@ export async function submitExercise(
     executionTimeMs: execution.executionTimeMs,
     error: execution.error,
     attemptId: attempt.id,
-    results: visibleResults,
+    cached: isCached,
+    results: sanitizedResults,
   };
 
   return { result };
 }
 
 /**
- * Runs learner code through the configured provider without recording an
- * attempt. Provider is injectable for tests.
+ * Runs learner code for dry run through the configured provider.
  */
 export async function runExercise(
   code: string,
   language: string,
+  userId?: string,
   provider: CodeExecutionProvider = getExecutionProvider(),
 ): Promise<{ error?: string; result?: ExecutionResult }> {
   const validationError = codeValidationError(code);
   if (validationError) return { error: validationError };
 
+  // Rate limit: 30 runs/min for logged-in, 10 runs/min for anonymous
+  const rateKey = userId ? `run:${userId}` : "run:guest";
+  const rateLimit = userId ? 30 : 10;
+  const rateCheck = await checkRateLimit({
+    key: rateKey,
+    limit: rateLimit,
+    windowSeconds: 60,
+    actionName: "dry run",
+  });
+  if (!rateCheck.allowed) {
+    return { error: rateCheck.reason };
+  }
+
+  const cacheKey = computeExecutionCacheKey(language, "dry-run", code);
+  const cached = await getCachedExecution(cacheKey);
+  if (cached) {
+    return { result: cached };
+  }
+
   const result = await provider.run({ code, language });
+  await setCachedExecution(cacheKey, result, 180);
   return { result };
 }

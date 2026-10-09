@@ -371,7 +371,7 @@ describe("runExercise", () => {
       executionTimeMs: 12,
     });
 
-    const { result } = await runExercise("print(3 + 4)", "python", provider);
+    const { result } = await runExercise("print(3 + 4)", "python", userId, provider);
     expect(result!.status).toBe("ok");
     expect(result!.stdout).toBe("7");
     expect(provider.ran).toMatchObject({ code: "print(3 + 4)", language: "python" });
@@ -388,7 +388,7 @@ describe("validation", () => {
     expect(error).toBe("Code is empty");
     expect(provider.submitted).toBeNull();
 
-    const { error: runError } = await runExercise("", "python", provider);
+    const { error: runError } = await runExercise("", "python", userId, provider);
     expect(runError).toBe("Code is empty");
     expect(provider.ran).toBeNull();
   });

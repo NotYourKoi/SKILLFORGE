@@ -144,6 +144,7 @@ export default async function ExercisePage({
             language={exercise.language}
             starterCode={exercise.starterCode}
             hints={exercise.hints}
+            totalHintsCount={exercise.totalHintsCount}
             executionMode={{
               provider: provider.name,
               executesCode: provider.executesCode,

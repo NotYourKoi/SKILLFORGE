@@ -17,6 +17,7 @@ import { filterValidSelectedAnswers, gradeQuiz } from "@/lib/quiz";
 import {
   runExercise as runExerciseCode,
   submitExercise as submitExerciseAttempt,
+  unlockHint as unlockExerciseHintProgress,
   type ExerciseSubmissionResult,
 } from "@/lib/exercises";
 import type { ExecutionResult } from "@/lib/execution";
@@ -286,7 +287,28 @@ export async function runExercise(
   });
   if (!exercise) return { error: "Exercise not found" };
 
-  return runExerciseCode(code, exercise.language);
+  return runExerciseCode(code, exercise.language, session.user.id);
+}
+
+/**
+ * Unlocks the next progressive hint for an exercise.
+ */
+export async function unlockExerciseHint(
+  exerciseId: string,
+): Promise<ActionResult & { result?: { unlockedHints: string[]; hintsUnlockedCount: number } }> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not signed in" };
+
+  const outcome = await unlockExerciseHintProgress(exerciseId, session.user.id);
+  if (outcome.error) return { error: outcome.error };
+
+  revalidatePath(`/exercise/${exerciseId}`);
+  return {
+    result: {
+      unlockedHints: outcome.unlockedHints ?? [],
+      hintsUnlockedCount: outcome.hintsUnlockedCount ?? 0,
+    },
+  };
 }
 
 /**

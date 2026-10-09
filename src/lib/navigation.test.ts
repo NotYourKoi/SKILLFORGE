@@ -5,7 +5,12 @@ describe("getNavItems", () => {
   it("returns only public routes for anonymous users", () => {
     const items = getNavItems({ authenticated: false });
     const hrefs = items.map((item) => item.href);
-    expect(hrefs).toEqual(["/explore", "/courses", "/search"]);
+    expect(hrefs).toEqual([
+      "/explore",
+      "/courses",
+      "/visualizers",
+      "/search",
+    ]);
   });
 
   it("returns the full nav for authenticated users in a stable order", () => {
@@ -15,6 +20,7 @@ describe("getNavItems", () => {
       "/dashboard",
       "/explore",
       "/courses",
+      "/visualizers",
       "/roadmap",
       "/projects",
       "/progress",
